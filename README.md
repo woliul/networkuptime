@@ -21,8 +21,8 @@ An offline-first desktop application for monitoring and logging your network con
 1.  Clone this repository to your local machine:
 
     ```bash
-    git clone https://github.com/YOUR_USERNAME/YOUR_REPOSITORY.git
-    cd YOUR_REPOSITORY
+    git clone https://github.com/woliul/networkuptime.git
+    cd networkuptime
     ```
 
 2.  Install the project dependencies:
