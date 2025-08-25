@@ -1,0 +1,39 @@
+{
+  "name": "network-monitor-app",
+  "version": "1.0.0",
+  "description": "An offline network monitor built with sql.js and Electron.",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "Electron",
+    "sql.js",
+    "offline"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^28.2.1",
+    "electron-builder": "^24.9.1"
+  },
+  "build": {
+    "appId": "com.yourname.networkmonitor",
+    "productName": "Network Monitor",
+    "win": {
+      "target": "nsis"
+    },
+    "files": [
+      "main.js",
+      "index.html",
+      "sql/",
+      "css/",
+      "js/"
+    ],
+    "directories": {
+      "output": "dist"
+    }
+  }
+}
