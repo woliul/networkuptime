@@ -17,7 +17,7 @@
   "license": "MIT",
   "devDependencies": {
     "electron": "^28.2.1",
-    "electron-builder": "^24.9.1"
+    "electron-builder": "^24.13.3"
   },
   "build": {
     "appId": "com.yourname.networkmonitor",
@@ -30,7 +30,8 @@
       "index.html",
       "sql/",
       "css/",
-      "js/"
+      "js/",
+      "node_modules/electron/dist/ffmpeg.dll"
     ],
     "directories": {
       "output": "dist"
