@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🌐 Network Monitor | SQLite in Browser</title>
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        /* Custom styles for the app */
+        body {
+            background-color: #f8f9fa; /* bg-gray-50 equivalent */
+        }
+        .container {
+            max-width: 960px; /* Equivalent to max-w-4xl */
+        }
+        /* Custom scrollbar for log table */
+        #log-body-container::-webkit-scrollbar {
+            width: 8px;
+        }
+        #log-body-container::-webkit-scrollbar-thumb {
+            background-color: #cbd5e1;
+            border-radius: 4px;
+        }
+        #log-body-container::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+    </style>
+</head>
+<body class="bg-light p-4 p-md-5 min-vh-100">
+
+<div class="container bg-white shadow-lg rounded-3 p-4">
+    <h1 class="h3 fw-bold text-gray-800 mb-3 d-flex align-items-center">
+        <span class="me-2">🌐</span> Network Connection Monitor
+    </h1>
+    <p class="text-secondary mb-4">
+        Monitoring your network connection using **sql.js** and **IndexedDB** for client-side persistence.
+    </p>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="card p-3 rounded-3 shadow-sm border-0">
+                <h2 class="h6 fw-semibold text-secondary mb-2">Current Status</h2>
+                <div id="status-display" class="p-3 text-center rounded-3 fw-mono fs-5 transition-colors duration-300 bg-gray-200 text-gray-700">
+                    Initializing...
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-8 d-flex flex-column flex-sm-row gap-3">
+            <div class="flex-grow-1 d-flex gap-3">
+                <button id="start-btn" class="flex-fill btn btn-primary fw-medium rounded-3 shadow-sm disabled:opacity-50">
+                    Start Monitoring
+                </button>
+                <button id="stop-btn" class="flex-fill btn btn-danger fw-medium rounded-3 shadow-sm disabled:opacity-50" disabled>
+                    Stop Monitoring
+                </button>
+            </div>
+            <div class="flex-shrink-0">
+                <label for="interval-input" class="visually-hidden">Interval (seconds)</label>
+                <input type="number" id="interval-input" min="1" max="60" value="1" placeholder="Interval (s)" class="form-control w-100 w-sm-25 px-3 py-2 rounded-3 shadow-sm">
+            </div>
+        </div>
+    </div>
+
+    <div class="mt-4">
+        <h2 class="h5 fw-semibold text-gray-800 mb-3 d-flex justify-content-between align-items-center">
+            Connection History
+            <button id="clear-logs-btn" class="btn btn-warning btn-sm rounded-3 shadow-sm disabled:opacity-50">
+                Clear Logs
+            </button>
+        </h2>
+
+        <div class="border border-gray-200 rounded-3 overflow-hidden shadow-sm">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover mb-0">
+                    <thead class="bg-light">
+                    <tr>
+                        <th class="px-3 py-2 text-start text-xs fw-medium text-secondary text-uppercase" style="width: 25%;">
+                            ID
+                        </th>
+                        <th class="px-3 py-2 text-start text-xs fw-medium text-secondary text-uppercase" style="width: 50%;">
+                            Timestamp
+                        </th>
+                        <th class="px-3 py-2 text-start text-xs fw-medium text-secondary text-uppercase" style="width: 25%;">
+                            Status
+                        </th>
+                    </tr>
+                    </thead>
+                </table>
+            </div>
+            <div id="log-body-container" class="max-h-80 overflow-y-auto bg-white">
+                <table class="table table-striped table-hover mb-0">
+                    <tbody id="log-table-body" class="bg-white">
+                    <tr>
+                        <td colspan="3" class="px-3 py-4 text-center text-sm text-secondary">No history yet.</td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="mt-4 pt-3 border-top border-light text-center text-xs text-secondary">
+        Powered by sql.js & IndexedDB
+    </div>
+</div>
+
+<script src="js/bootstrap.bundle.min.js"></script>
+<script src="sql/sql-wasm.js"></script>
+
+<script>
+    // --- CONSTANTS ---
+    const DB_NAME = 'networkMonitorDB';
+    const DB_STORE_NAME = 'sqliteData';
+    const FETCH_TARGET = 'https://www.google.com/favicon.ico'; // Small, reliable file
+    const FETCH_TIMEOUT_MS = 5000;
+
+    // --- STATE VARIABLES ---
+    let SQL;           // Holds the sql.js module
+    let db;            // Holds the SQLite database instance
+    let monitorInterval = null; // Holds the setInterval ID
+    let lastKnownStatus = null; // 'Up' or 'Down'
+
+    // --- DOM ELEMENTS ---
+    const statusDisplay = document.getElementById('status-display');
+    const startBtn = document.getElementById('start-btn');
+    const stopBtn = document.getElementById('stop-btn');
+    const clearLogsBtn = document.getElementById('clear-logs-btn');
+    const intervalInput = document.getElementById('interval-input');
+    const logTableBody = document.getElementById('log-table-body');
+
+    // ==============================
+    // 1. IndexedDB Persistence Logic
+    // ==============================
+
+    /**
+     * Saves the current SQLite database file to IndexedDB.
+     */
+    async function saveDbToIndexedDB() {
+        if (!db) return;
+        const data = db.export(); // Export the database as Uint8Array
+
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open(DB_NAME, 1);
+
+            request.onupgradeneeded = function(e) {
+                const idb = e.target.result;
+                idb.createObjectStore(DB_STORE_NAME);
+            };
+
+            request.onsuccess = function(e) {
+                const idb = e.target.result;
+                const transaction = idb.transaction([DB_STORE_NAME], 'readwrite');
+                const store = transaction.objectStore(DB_STORE_NAME);
+
+                const putRequest = store.put(data, 'main');
+
+                putRequest.onsuccess = () => resolve();
+                putRequest.onerror = (err) => reject(err);
+            };
+
+            request.onerror = (e) => reject(e.target.error);
+        });
+    }
+
+    /**
+     * Loads the SQLite database file from IndexedDB.
+     * @returns {Uint8Array | null} The database data or null if not found.
+     */
+    async function loadDbFromIndexedDB() {
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open(DB_NAME, 1);
+
+            request.onupgradeneeded = function(e) {
+                const idb = e.target.result;
+                idb.createObjectStore(DB_STORE_NAME);
+            };
+
+            request.onsuccess = function(e) {
+                const idb = e.target.result;
+                const transaction = idb.transaction([DB_STORE_NAME], 'readonly');
+                const store = transaction.objectStore(DB_STORE_NAME);
+
+                const getRequest = store.get('main');
+
+                getRequest.onsuccess = function() {
+                    resolve(getRequest.result || null);
+                };
+                getRequest.onerror = (err) => reject(err);
+            };
+
+            request.onerror = (e) => reject(e.target.error);
+            request.onblocked = () => { /* Handle blocked state if needed */ };
+        });
+    }
+
+    /**
+     * Deletes the SQLite database file from IndexedDB.
+     */
+    async function deleteDbFromIndexedDB() {
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open(DB_NAME, 1);
+
+            request.onupgradeneeded = function(e) {
+                const idb = e.target.result;
+                if (!idb.objectStoreNames.contains(DB_STORE_NAME)) {
+                    idb.createObjectStore(DB_STORE_NAME);
+                }
+            };
+
+            request.onsuccess = function(e) {
+                const idb = e.target.result;
+                const transaction = idb.transaction([DB_STORE_NAME], 'readwrite');
+                const store = transaction.objectStore(DB_STORE_NAME);
+
+                const deleteRequest = store.delete('main');
+
+                deleteRequest.onsuccess = () => resolve();
+                deleteRequest.onerror = (err) => reject(err);
+            };
+
+            request.onerror = (e) => reject(e.target.error);
+        });
+    }
+
+    // ==============================
+    // 2. SQL.js Database Operations
+    // ==============================
+
+    /**
+     * Initializes the SQLite database, loading from IndexedDB if data exists.
+     */
+    async function initDb() {
+        try {
+            // Initialize sql.js, pointing to the local wasm file
+            SQL = await initSqlJs({
+                locateFile: file => `sql/sql-wasm.wasm`
+            });
+
+            // Try loading from IndexedDB
+            const data = await loadDbFromIndexedDB();
+
+            if (data) {
+                db = new SQL.Database(data);
+                console.log('Database loaded from IndexedDB.');
+            } else {
+                db = new SQL.Database();
+                // Create the table if it's a new database
+                db.exec(`
+                        CREATE TABLE network_logs (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            timestamp TEXT NOT NULL,
+                            status TEXT NOT NULL
+                        );
+                    `);
+                console.log('New database created.');
+                await saveDbToIndexedDB(); // Save the initial empty structure
+            }
+
+            await updateLogDisplay(); // Display historical data
+            updateUI('Down', 'Ready to start monitoring.');
+            startBtn.disabled = false;
+            clearLogsBtn.disabled = false;
+
+        } catch (error) {
+            console.error('Error initializing database:', error);
+            alert('Failed to initialize database. Check console for details.');
+        }
+    }
+
+    /**
+     * Logs the network status change to the SQLite database.
+     * @param {string} status 'Up' or 'Down'.
+     */
+    function logNetworkStatus(status) {
+        if (!db) return;
+
+        const timestamp = new Date().toISOString();
+        const statement = db.prepare("INSERT INTO network_logs (timestamp, status) VALUES (?, ?)");
+
+        try {
+            statement.run([timestamp, status]);
+            console.log(`Logged status: ${status} at ${timestamp}`);
+
+            // Immediately persist the change
+            saveDbToIndexedDB().catch(e => console.error('Failed to save DB after logging:', e));
+
+            // Update the UI
+            updateLogDisplay();
+
+        } catch (e) {
+            console.error('Error executing SQL:', e);
+        } finally {
+            statement.free(); // Free the statement memory
+        }
+    }
+
+    // ==============================
+    // 3. Network Monitoring Logic
+    // ==============================
+
+    /**
+     * Checks the network connection by attempting a fetch request.
+     * @returns {Promise<boolean>} True if connected, false otherwise.
+     */
+    async function isConnected() {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
+        try {
+            await fetch(FETCH_TARGET, {
+                method: 'HEAD',
+                cache: 'no-store',
+                signal: controller.signal,
+                mode: 'no-cors' // <-- THE FIX: Tell the browser this is a cross-origin check.
+            });
+
+            // If the fetch promise resolves, it means a network connection was successfully made,
+            // even if the response is opaque.
+            clearTimeout(timeoutId);
+            return true;
+
+        } catch (error) {
+            // This block is entered on a genuine network error (e.g., no internet, DNS failure)
+            // or the timeout.
+            clearTimeout(timeoutId);
+            return false;
+        }
+    }
+
+    /**
+     * Performs the connection check and logs if the status has changed.
+     */
+    async function performCheck() {
+        const isUp = await isConnected();
+        const currentStatus = isUp ? 'Up' : 'Down';
+
+        updateUI(currentStatus, `Last checked: ${new Date().toLocaleTimeString()}`);
+
+        // Log if the status has changed from the last known state.
+        // This will now correctly log the very first check.
+        if (currentStatus !== lastKnownStatus) {
+            logNetworkStatus(currentStatus);
+            lastKnownStatus = currentStatus;
+        }
+    }
+
+    // ==============================
+    // 4. UI Functions & Event Handlers
+    // ==============================
+
+    /**
+     * Updates the main status display element.
+     * @param {string} status 'Up' or 'Down'.
+     * @param {string} message Secondary message.
+     */
+    function updateUI(status, message) {
+        statusDisplay.textContent = status === 'Up' ? '🟢 ONLINE' : (status === 'Down' ? '🔴 OFFLINE' : message);
+
+        // Bootstrap classes for color change
+        if (status === 'Up') {
+            statusDisplay.className = 'p-3 text-center rounded-3 fw-mono fs-5 transition-colors duration-300 bg-success-subtle text-success';
+        } else if (status === 'Down') {
+            statusDisplay.className = 'p-3 text-center rounded-3 fw-mono fs-5 transition-colors duration-300 bg-danger-subtle text-danger';
+        } else {
+            statusDisplay.className = 'p-3 text-center rounded-3 fw-mono fs-5 transition-colors duration-300 bg-gray-200 text-gray-700';
+            statusDisplay.textContent = message;
+        }
+    }
+
+    /**
+     * Queries and updates the connection history table.
+     */
+    async function updateLogDisplay() {
+        if (!db) return;
+
+        logTableBody.innerHTML = ''; // Clear existing logs
+
+        try {
+            const res = db.exec("SELECT id, timestamp, status FROM network_logs ORDER BY id DESC");
+
+            if (res.length === 0 || res[0].values.length === 0) {
+                logTableBody.innerHTML = `<tr><td colspan="3" class="px-3 py-4 text-sm text-secondary text-center">No history yet.</td></tr>`;
+                return;
+            }
+
+            const rows = res[0].values;
+
+            rows.forEach(row => {
+                const [id, isoTimestamp, status] = row;
+                const date = new Date(isoTimestamp);
+
+                const timeString = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                const dateString = date.toLocaleDateString();
+
+                const statusColor = status === 'Up' ? 'text-success fw-semibold' : 'text-danger fw-semibold';
+
+                const newRow = logTableBody.insertRow();
+
+                // ID Cell
+                let idCell = newRow.insertCell();
+                idCell.className = 'px-3 py-2 text-sm fw-medium text-dark';
+                idCell.textContent = id;
+
+                // Timestamp Cell
+                let timestampCell = newRow.insertCell();
+                timestampCell.className = 'px-3 py-2 text-sm text-secondary fw-mono';
+                timestampCell.innerHTML = `<span class="d-block">${dateString}</span><span class="text-xs text-secondary">${timeString}</span>`;
+
+                // Status Cell
+                let statusCell = newRow.insertCell();
+                statusCell.className = `px-3 py-2 text-sm ${statusColor}`;
+                statusCell.textContent = status;
+            });
+
+        } catch (e) {
+            console.error('Error querying logs:', e);
+        }
+    }
+
+    /**
+     * Starts the monitoring interval.
+     */
+    function startMonitoring() {
+        if (monitorInterval) return;
+
+        const intervalSeconds = parseInt(intervalInput.value);
+        if (isNaN(intervalSeconds) || intervalSeconds < 1) {
+            alert('Please enter a valid interval (1 second or more).');
+            return;
+        }
+
+        const intervalMs = intervalSeconds * 1000;
+
+        // Run the check immediately
+        performCheck();
+
+        // Set the interval for repeated checks
+        monitorInterval = setInterval(performCheck, intervalMs);
+
+        startBtn.disabled = true;
+        stopBtn.disabled = false;
+        intervalInput.disabled = true;
+        updateUI(null, `Monitoring started at ${intervalSeconds}s interval...`);
+    }
+
+    /**
+     * Stops the monitoring interval.
+     */
+    function stopMonitoring() {
+        if (monitorInterval) {
+            clearInterval(monitorInterval);
+            monitorInterval = null;
+            updateUI(lastKnownStatus, `Monitoring stopped.`);
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+            intervalInput.disabled = false;
+        }
+    }
+
+    /**
+     * Clears all logs from the database and IndexedDB.
+     */
+    async function clearLogs() {
+        if (!confirm('Are you sure you want to clear all connection history? This action is irreversible.')) {
+            return;
+        }
+
+        // Stop monitoring first
+        stopMonitoring();
+
+        try {
+            // Drop the table, then recreate it
+            db.exec("DROP TABLE IF EXISTS network_logs;");
+            db.exec(`
+                    CREATE TABLE network_logs (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        timestamp TEXT NOT NULL,
+                        status TEXT NOT NULL
+                    );
+                `);
+
+            // Delete from IndexedDB to persist the clear action
+            await deleteDbFromIndexedDB();
+            await saveDbToIndexedDB(); // Save the new, empty structure
+
+            lastKnownStatus = null; // Reset status tracking
+            await updateLogDisplay(); // Refresh UI
+            updateUI(null, 'Logs cleared. Ready to start monitoring.');
+
+            console.log('All logs cleared successfully.');
+
+        } catch (error) {
+            console.error('Error clearing logs:', error);
+            alert('Failed to clear logs. See console for details.');
+        }
+    }
+
+    // ==============================
+    // 5. Initialization
+    // ==============================
+
+    // Add event listeners
+    startBtn.addEventListener('click', startMonitoring);
+    stopBtn.addEventListener('click', stopMonitoring);
+    clearLogsBtn.addEventListener('click', clearLogs);
+
+    // Initial UI state
+    startBtn.disabled = true;
+    stopBtn.disabled = true;
+    clearLogsBtn.disabled = true;
+
+    // Start the application
+    initDb();
+
+    // Ensure database is saved before page unload
+    window.addEventListener('beforeunload', saveDbToIndexedDB);
+
+</script>
+</body>
+</html>
