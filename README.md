@@ -66,7 +66,7 @@ To create a distributable installer for Windows, macOS, or Linux, use Electron B
 ## 📂 Project Structure
 
 ```
-network-monitor-app/
+networkuptime/
 ├── node_modules/           # Project dependencies
 ├── css/
 │   └── bootstrap.min.css   # Local Bootstrap CSS
