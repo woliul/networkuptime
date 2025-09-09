@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NOC-ISP Network Log</title>
+    <link rel="icon" type="image/png" href="./assets/network.png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #111827;
+        }
+        .log-table-container::-webkit-scrollbar {
+            width: 8px;
+        }
+        .log-table-container::-webkit-scrollbar-thumb {
+            background-color: #4b5563;
+            border-radius: 4px;
+        }
+        .log-table-container::-webkit-scrollbar-track {
+            background: #1f2937;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white p-4 md:p-8">
+
+<div class="max-w-4xl mx-auto bg-gray-800 shadow-xl rounded-lg p-6 md:p-8">
+    <h1 class="text-3xl font-bold text-gray-100 mb-0 flex items-center">
+        Network Link Monitor
+    </h1>
+
+    <p id="link-status-text" class="text-sm text-gray-400 mb-6"> Nikunja-DhakaColo: Link Status</p>
+
+    <div class="grid md:grid-cols-2 gap-6 mb-6">
+        <div>
+            <h2 class="text-2xl font-bold text-gray-200 mb-1">Primary Link</h2>
+            <p class="text-xs text-gray-400 mb-5">192.168.240.14 ispE</p>
+            <div id="primary-status-display" class="p-3 text-center rounded-lg font-mono text-xl transition-colors duration-300 bg-gray-600 text-gray-300">
+                Initializing...
+            </div>
+        </div>
+        <div>
+            <h2 class="text-xl font-semibold text-gray-200 mb-1">Secondary Link</h2>
+            <p class="text-xs text-gray-400 mb-5">192.168.240.6 ispA</p>
+            <div id="secondary-status-display" class="p-3 text-center rounded-lg font-mono text-xl transition-colors duration-300 bg-gray-600 text-gray-300">
+                Initializing...
+            </div>
+        </div>
+    </div>
+
+    <div class="mt-0">
+        <h2 class="text-xl font-semibold text-gray-200 mb-3 flex justify-between items-center">
+            Network Log
+            <button id="clear-logs-btn" class="text-sm px-3 py-1 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition duration-150 shadow-sm disabled:opacity-50">
+                Clear Logs
+            </button>
+        </h2>
+        <hr class="border-gray-700 mb-6">
+        <div class="grid md:grid-cols-2 gap-6">
+            <div>
+                <h4 class="text-lg font-medium text-gray-300 mb-2">Primary</h4>
+                <div class="log-table-container max-h-80 overflow-y-auto bg-gray-900 rounded-lg">
+                    <table class="min-w-full divide-y divide-gray-700">
+                        <thead class="bg-gray-700 sticky top-0">
+                        <tr>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Timestamp</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Status</th>
+                        </tr>
+                        </thead>
+                        <tbody id="primary-log-table-body" class="divide-y divide-gray-700">
+                        <tr><td colspan="2" class="px-4 py-4 text-sm text-gray-500 text-center">No history yet.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div>
+                <h4 class="text-lg font-medium text-gray-300 mb-2">Secondary</h4>
+                <div class="log-table-container max-h-80 overflow-y-auto bg-gray-900 rounded-lg">
+                    <table class="min-w-full divide-y divide-gray-700">
+                        <thead class="bg-gray-700 sticky top-0">
+                        <tr>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Timestamp</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Status</th>
+                        </tr>
+                        </thead>
+                        <tbody id="secondary-log-table-body" class="divide-y divide-gray-700">
+                        <tr><td colspan="2" class="px-4 py-4 text-sm text-gray-500 text-center">No history yet.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="./sql/sql-wasm.js"></script>
+<script>
+
+    // network.js
+
+    // --- Core Data Fetching and Parsing Logic ---
+    const TEMP_DATA_URL = 'temp.html';
+
+    async function fetchData() {
+        try {
+            const response = await fetch(TEMP_DATA_URL);
+            if (!response.ok) {
+                throw new Error(`HTTP error! Status: ${response.status}`);
+            }
+            const htmlString = await response.text();
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(htmlString, 'text/html');
+            const bodyText = doc.body.innerText;
+
+            const data = {
+                primaryStatus: null,
+                secondaryStatus: null,
+            };
+
+            const primaryMatch = bodyText.match(/Primary Link\(.+\):.*?(\w+)/);
+            if (primaryMatch) data.primaryStatus = primaryMatch[1].trim().toUpperCase();
+
+            const secondaryMatch = bodyText.match(/Secondary Link\(.+\):.*?(\w+)/);
+            if (secondaryMatch) data.secondaryStatus = secondaryMatch[1].trim().toUpperCase();
+
+            return data;
+        } catch (error) {
+            console.error('Fetch Error:', error);
+            return {
+                primaryStatus: 'DOWN',
+                secondaryStatus: 'DOWN',
+            };
+        }
+    }
+
+    // --- Network Log Logic ---
+    const DB_NAME = 'networkMonitorDB';
+    const DB_STORE_NAME = 'sqliteData';
+    let SQL, db;
+    let lastKnownPrimaryStatus = null;
+    let lastKnownSecondaryStatus = null;
+
+    const networkElements = {
+        primaryDisplay: document.getElementById('primary-status-display'),
+        secondaryDisplay: document.getElementById('secondary-status-display'),
+        primaryLogBody: document.getElementById('primary-log-table-body'),
+        secondaryLogBody: document.getElementById('secondary-log-table-body'),
+    };
+    const clearLogsBtn = document.getElementById('clear-logs-btn');
+
+    async function initDb() {
+        SQL = await initSqlJs({ locateFile: file => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/${file}` });
+        const data = await loadDbFromIndexedDB();
+        if (data) {
+            db = new SQL.Database(data);
+        } else {
+            db = new SQL.Database();
+            db.exec(`
+            CREATE TABLE primary_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT NOT NULL, status TEXT NOT NULL);
+            CREATE TABLE secondary_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT NOT NULL, status TEXT NOT NULL);
+        `);
+            await saveDbToIndexedDB();
+        }
+        await updateAllLogDisplays();
+        clearLogsBtn.disabled = false;
+    }
+
+    async function saveDbToIndexedDB() {
+        if (!db) return;
+        const data = db.export();
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open(DB_NAME, 1);
+            request.onupgradeneeded = e => e.target.result.createObjectStore(DB_STORE_NAME);
+            request.onsuccess = e => {
+                const transaction = e.target.result.transaction([DB_STORE_NAME], 'readwrite');
+                const putRequest = transaction.objectStore(DB_STORE_NAME).put(data, 'main');
+                putRequest.onsuccess = () => resolve();
+                putRequest.onerror = err => reject(err);
+            };
+            request.onerror = e => reject(e.target.error);
+        });
+    }
+
+    async function loadDbFromIndexedDB() {
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open(DB_NAME, 1);
+            request.onupgradeneeded = e => e.target.result.createObjectStore(DB_STORE_NAME);
+            request.onsuccess = e => {
+                const transaction = e.target.result.transaction([DB_STORE_NAME], 'readonly');
+                const getRequest = transaction.objectStore(DB_STORE_NAME).get('main');
+                getRequest.onsuccess = () => resolve(getRequest.result || null);
+                getRequest.onerror = err => reject(err);
+
+            };
+            request.onerror = e => reject(e.target.error);
+        });
+    }
+
+    async function deleteDbFromIndexedDB() {
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open(DB_NAME, 1);
+            request.onsuccess = e => {
+                const transaction = e.target.result.transaction([DB_STORE_NAME], 'readwrite');
+                const deleteRequest = transaction.objectStore(DB_STORE_NAME).delete('main');
+                deleteRequest.onsuccess = () => resolve();
+                deleteRequest.onerror = err => reject(err);
+            };
+            request.onerror = e => reject(e.target.error);
+        });
+    }
+
+    async function updateDashboardData() {
+        const data = await fetchData();
+        if (data) {
+            updateNetworkUI(data.primaryStatus, data.secondaryStatus);
+        } else {
+            updateNetworkUI('DOWN', 'DOWN');
+        }
+    }
+
+    function updateNetworkUI(primaryStatus, secondaryStatus) {
+        updateSingleNetworkElement(networkElements.primaryDisplay, primaryStatus);
+        updateSingleNetworkElement(networkElements.secondaryDisplay, secondaryStatus);
+
+        if (primaryStatus !== lastKnownPrimaryStatus && primaryStatus !== null) {
+            logLinkStatus('primary', primaryStatus);
+            lastKnownPrimaryStatus = primaryStatus;
+        }
+        if (secondaryStatus !== lastKnownSecondaryStatus && secondaryStatus !== null) {
+            logLinkStatus('secondary', secondaryStatus);
+            lastKnownSecondaryStatus = secondaryStatus;
+        }
+
+        const linkStatusText = document.getElementById('link-status-text');
+        linkStatusText.classList.remove('text-green-400', 'text-red-500', 'text-gray-400');
+        if (primaryStatus === 'UP' && secondaryStatus === 'UP') {
+            linkStatusText.classList.add('text-green-400');
+        } else if (primaryStatus === 'DOWN' || secondaryStatus === 'DOWN') {
+            linkStatusText.classList.add('text-red-500');
+        } else {
+            linkStatusText.classList.add('text-gray-400');
+        }
+
+
+    }
+
+
+
+    function updateSingleNetworkElement(element, status) {
+        element.textContent = status;
+        element.classList.remove('bg-green-100', 'text-green-700', 'bg-red-100', 'text-red-700', 'bg-gray-600', 'text-gray-300');
+        if (status === 'UP') {
+            element.classList.add('bg-green-100', 'text-green-700');
+        } else if (status === 'DOWN') {
+            element.classList.add('bg-red-100', 'text-red-700');
+        } else {
+            element.classList.add('bg-gray-600', 'text-gray-300');
+            element.textContent = 'Initializing...';
+        }
+    }
+
+    function logLinkStatus(link, status) {
+        if (!db) return;
+        const tableName = `${link.toLowerCase()}_logs`;
+        const timestamp = new Date().toISOString();
+        const statement = db.prepare(`INSERT INTO ${tableName} (timestamp, status) VALUES (?, ?)`);
+        try {
+            statement.run([timestamp, status]);
+            saveDbToIndexedDB();
+            updateAllLogDisplays();
+        } catch (e) {
+            console.error('Error executing SQL:', e);
+        } finally {
+            statement.free();
+        }
+    }
+
+    async function clearAllLogs() {
+        if (!confirm('Are you sure you want to clear all Network Log? This is irreversible.')) return;
+        try {
+            db.exec("DROP TABLE IF EXISTS primary_logs; DROP TABLE IF EXISTS secondary_logs;");
+            db.exec("CREATE TABLE primary_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT NOT NULL, status TEXT NOT NULL);");
+            db.exec("CREATE TABLE secondary_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT NOT NULL, status TEXT NOT NULL);");
+            await deleteDbFromIndexedDB();
+            await saveDbToIndexedDB();
+            lastKnownPrimaryStatus = null;
+            lastKnownSecondaryStatus = null;
+            await updateAllLogDisplays();
+            alert('All logs cleared.');
+        } catch (error) {
+            console.error('Error clearing logs:', error);
+            alert('Failed to clear logs.');
+        }
+    }
+
+    async function updateAllLogDisplays() {
+        await updateLogTable('primary', networkElements.primaryLogBody);
+        await updateLogTable('secondary', networkElements.secondaryLogBody);
+    }
+
+    async function updateLogTable(link, tableBodyElement) {
+        if (!db) return;
+        tableBodyElement.innerHTML = '';
+        const tableName = `${link}_logs`;
+        try {
+            const res = db.exec(`SELECT timestamp, status FROM ${tableName} ORDER BY id DESC`);
+            if (res.length === 0 || res[0].values.length === 0) {
+                tableBodyElement.innerHTML = `<tr><td colspan="2" class="px-4 py-4 text-sm text-gray-500 text-center">No history yet.</td></tr>`;
+                return;
+            }
+            const rows = res[0].values;
+            rows.forEach(row => {
+                const [isoTimestamp, status] = row;
+                const date = new Date(isoTimestamp);
+                const timeString = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                const dateString = date.toLocaleDateString();
+                const statusColor = status === 'UP' ? 'text-green-400' : 'text-red-500';
+                const newRow = tableBodyElement.insertRow();
+                newRow.className = 'hover:bg-gray-700';
+                newRow.insertCell().innerHTML = `<div class="px-4 py-2 text-sm text-gray-400 font-mono"><span class="block">${dateString}</span><span class="text-xs text-gray-500">${timeString}</span></div>`;
+                newRow.insertCell().innerHTML = `<div class="px-4 py-2 text-sm font-semibold ${statusColor}">${status}</div>`;
+            });
+        } catch (e) {
+            console.error(`Error querying ${link} logs:`, e);
+        }
+    }
+
+    clearLogsBtn.addEventListener('click', clearAllLogs);
+
+    initDb();
+    setInterval(updateDashboardData, 5000);
+    updateDashboardData();
+
+    window.addEventListener('beforeunload', saveDbToIndexedDB);
+</script>
+
+</body>
+</html>
