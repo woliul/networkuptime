@@ -1,40 +1,54 @@
 {
-  "name": "network-monitor-app",
-  "version": "1.0.0",
-  "description": "An offline network monitor built with sql.js and Electron.",
+  "name": "network-uptime-monitor",
+  "version": "1.0.2",
+  "description": "An offline network uptime monitor develop by Woliul Hasan.",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "dist": "electron-builder --win",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "electron-builder"
   },
   "keywords": [
-    "Electron",
-    "sql.js",
-    "offline"
+    "electron",
+    "monitor",
+    "temperature",
+    "alert"
   ],
-  "author": "Your Name",
+  "author": "Woliul",
   "license": "MIT",
   "devDependencies": {
-    "electron": "^28.2.1",
-    "electron-builder": "^24.13.3"
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1"
   },
   "build": {
-    "appId": "com.yourname.networkmonitor",
-    "productName": "Network Monitor",
+    "appId": "com.woliul.NetworkUptime",
+    "productName": "NetworkUptime",
+    "icon": "./assets/network.png",
     "win": {
       "target": "nsis"
     },
+    "mac": {
+      "target": "dmg"
+    },
     "files": [
       "main.js",
+      "preload.js",
       "index.html",
-      "sql/",
-      "css/",
-      "js/",
-      "node_modules/electron/dist/ffmpeg.dll"
+      "assets/**/*",
+      "sql/sql-wasm.wasm"
     ],
-    "directories": {
-      "output": "dist"
-    }
+    "asar": true,
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "woliul",
+        "repo": "networkuptime"
+      }
+    ]
+  },
+  "dependencies": {
+    "date-fns": "^4.1.0",
+    "electron-log": "^5.4.3",
+    "electron-updater": "^6.6.2",
+    "sql.js": "^1.13.0"
   }
 }
