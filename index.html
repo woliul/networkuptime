@@ -3,23 +3,111 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Network Uptime Monitor | By Woliul Hasan</title>
-    <!-- Tailwind CSS for styling -->
+    <title>💡 Network Monitor | SQLite in Browser</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Phosphor Icons for iconography -->
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
-    <!-- We no longer need to load SQL.js here, as the Main process handles it -->
 
-    <!-- Google Fonts: Inter & Fira Code -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        /* Custom styles for the dashboard */
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #111827; /* bg-gray-900 */
+        /* Custom scrollbar for log table */
+        #log-body-container::-webkit-scrollbar {
+            width: 8px;
+        }
+        #log-body-container::-webkit-scrollbar-thumb {
+            background-color: #cbd5e1; /* slate-300 */
+            border-radius: 4px;
+        }
+        #log-body-container::-webkit-scrollbar-track {
+            background: #f1f5f9; /* slate-100 */
+        }
+
+        /* * NEW CSS: Status Dot and Pulse Animation
+         * We define the pulse here to use in the JS-injected HTML.
+         */
+        @keyframes pulse-dot-up {
+            0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); } /* green-600 */
+            70% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+
+        @keyframes pulse-dot-down {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); } /* red-500 */
+            70% { box-shadow: 0 0 0 4px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+
+        .status-dot {
+            display: inline-block;
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            margin-right: 8px;
+            position: relative;
+
+        }
+
+        .status-up .status-dot {
+            background-color: #10b981; /* green-500 */
+            animation: pulse-dot-up 2s infinite;
+        }
+
+        .status-down .status-dot {
+            background-color: #ef4444; /* red-500 */
+            animation: pulse-dot-down 2s infinite;
+        }
+
+        /* * NEW CSS: Styles to match the flat background look
+         * We target the status display ID to override its default background and padding.
+         */
+        #status-display.status-up {
+            background-color: transparent !important;
+            padding: 0 !important;
+            color: #10b981 !important; /* green-500 */
+            font-weight: 700; /* bold */
+            text-align: right !important;
+        }
+
+        #status-display.status-down {
+            background-color: transparent !important;
+            padding: 0 !important;
+            color: #ef4444 !important; /* red-500 */
+            font-weight: 700;
+            text-align: right !important;
+        }
+
+        #status-display.status-default {
+            /* Keep original styles for Initializing... state */
+            background-color: #e5e7eb; /* gray-200 */
+            color: #4b5563; /* gray-700 */
+            text-align: center !important;
+        }
+
+        /* General layout adjustments to match your image */
+        .md\:col-span-1 {
+            /* This targets the parent container of the status box */
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        /* Adjusting the header for the status section */
+        .md\:col-span-1 h2 {
+            font-size: 1.25rem; /* xl */
+            font-weight: 700; /* bold */
+            color: #1f2937; /* gray-800 */
+        }
+
+        /* Adding a subtitle for host (mimicking your image) */
+        .status-box-header p {
+            font-size: 0.75rem; /* xs */
+            color: #6b7280; /* gray-500 */
+            margin-bottom: 0.5rem;
+        }
+
+        /* Use flexbox to put title/subtitle on left and status on right */
+        .status-box-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
         .card {
             background-color: #1f2937; /* bg-gray-800 */
@@ -34,413 +122,478 @@
             transform: translateY(-5px);
             box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
         }
-        .log-card {
-            background-color: #111827; /* bg-gray-900 */
-            border: 1px solid #374151; /* border-gray-700 */
-            padding: 1.5rem;
-            border-radius: 0.75rem;
-        }
-        .table-container {
-            max-height: 250px;
-            overflow-y: auto;
-        }
-        /* Custom scrollbar */
-        .table-container::-webkit-scrollbar { width: 8px; }
-        .table-container::-webkit-scrollbar-track { background: #1f2937; }
-        .table-container::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
 
-        /* Dynamic Status Classes */
-        .status-up { color: #22c55e; background-color: rgba(34, 197, 94, 0.1); }
-        .status-down { color: #ef4444; background-color: rgba(239, 68, 68, 0.1); }
-
-        .status-badge {
-            display: inline-block;
-            padding: 0.25rem 0.75rem;
-            border-radius: 9999px;
-            font-weight: 600;
-            font-size: 0.875rem;
-        }
-
-        .icon {
-            font-size: 1.875rem; /* text-3xl */
-            line-height: 2.25rem;
-            color: #9ca3af; /* text-gray-400 */
-        }
     </style>
 </head>
-<body class="text-white">
+<body class="bg-gray-50 p-4 md:p-8 min-h-screen">
 
-<div class="container mx-auto p-4 md:p-8">
-    <!-- Header -->
-    <header class="text-center mb-8 md:mb-12">
-        <h1 class="text-3xl md:text-4xl font-bold text-white">Network Monitoring Dashboard</h1>
-        <p class="text-gray-400 mt-2">Real-time Network Monitoring</p>
-    </header>
+<header class="text-center mb-8 md:mb-12">
+    <h1 class="text-3xl md:text-4xl text-gray-700 font-bold">Network Monitoring Dashboard</h1>
+    <p class="text-text-sm-400 mt-2">Real-time Network Monitoring</p>
+</header>
 
-    <main class="flex flex-col gap-8 md:gap-12">
-        <!-- Link Status Section (Network Card) -->
-        <section>
+<div class="grid grid-cols-1 gap-6 md:gap-8">
 
-            <div class="grid grid-cols-1 gap-6 md:gap-8">
-                <!-- Primary Link Card -->
-                <div class="card p-8 md:p-10" id="primary-link-card">
-                    <!-- Card Header with Status on the Right -->
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <h2 class="text-3xl font-bold">Network Status</h2>
-                            <p class="text-base text-gray-400 mt-1">Connectivity Check: Google 8.8.8.8</p>
-                        </div>
-                        <!-- UP/DOWN Status -->
-                        <div id="primary-link-status-container" class="flex items-center space-x-3">
-                                <span id="primary-link-status-spinner" class="relative flex h-4 w-4">
-                                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
-                                    <span class="relative inline-flex rounded-full h-4 w-4 bg-yellow-500"></span>
-                                </span>
-                            <span id="primary-link-status-text" class="font-extrabold text-2xl text-yellow-500">CHECKING...</span>
-                        </div>
-                    </div>
-                </div>
+    <div class="card p-8 bg-white border border-gray-200">
+        <div class="flex items-center justify-between">
+            <div >
+                <h2 class="text-3xl font-bold text-gray-700 mb-1">Network Status</h2>
+                <p class="text-sm text-gray-500 mb-4">Connectivity Check Host: Google</p>
             </div>
-        </section>
 
-        <!-- Link Log Table Section -->
-        <section>
-            <div class="log-card">
-                <!-- LOG HEADER WITH BUTTONS -->
-                <div class="flex items-center mb-4 justify-between">
-                    <div class="flex items-center">
-                        <i class="ph ph-activity icon mr-3"></i>
-                        <h2 class="text-xl font-semibold">Network Activity Log</h2>
-                    </div>
-                    <!-- Action Buttons -->
-                    <div class="space-x-2 flex">
-                        <!-- Export CSV Button (Manual Export) -->
-                        <button id="export-log-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-1 px-3 rounded-lg text-sm shadow-md transition duration-150 ease-in-out flex items-center">
-                            <i class="ph ph-download mr-1 text-base"></i>
-                            Export CSV
-                        </button>
-                        <!-- Clear Log Button -->
-                        <button id="clear-log-btn" class="bg-red-600 hover:bg-red-700 text-white font-medium py-1 px-3 rounded-lg text-sm shadow-md transition duration-150 ease-in-out flex items-center">
-                            <i class="ph ph-trash mr-1 text-base"></i>
-                            Clear Log
-                        </button>
-                    </div>
-                </div>
-                <!-- /LOG HEADER WITH BUTTONS -->
-
-                <div id="log-loading-indicator" class="text-center text-gray-500 my-4">Loading local SQL database...</div>
-                <div class="table-container">
-                    <table class="w-full text-sm text-left text-gray-300">
-                        <thead class="text-xs text-gray-400 uppercase bg-gray-800 sticky top-0">
-                        <tr>
-                            <th scope="col" class="px-6 py-3">SL</th>
-                            <th scope="col" class="px-6 py-3">Timestamp</th>
-                            <th scope="col" class="px-6 py-3">Status</th>
-                        </tr>
-                        </thead>
-                        <tbody id="link-log-body">
-                        <!-- Dynamic log entries here -->
-                        </tbody>
-                    </table>
-                </div>
+            <div id="status-display" class="p-3 text-center rounded-lg font-extrabold text-2xl transition-colors duration-300 bg-gray-200 text-gray-700 status-default">
+                Initializing...
             </div>
-        </section>
-    </main>
-
-    <!-- Footer: Last Updated & Persistence Status -->
-    <footer class="text-center mt-8 md:mt-12">
-        <div class="inline-flex items-center text-gray-400">
-            <i class="ph ph-clock mr-2 text-lg"></i>
-            <p id="footer-last-updated">Last Check: N/A</p>
         </div>
-        <p id="persistence-status" class="text-xs text-gray-500 mt-1">Persistence: Initializing Electron File System...</p>
-    </footer>
-
+    </div>
 </div>
 
-<!-- Application Logic using Electron's IPC -->
-<script type="module">
-    // NOTE: SQL.js is now handled entirely in the main.js process.
-    // The Renderer (this script) communicates via the exposed 'window.api' bridge.
+<div class="card p-8 bg-white border border-gray-200 mt-8">
+    <div class="text-xl font-semibold text-gray-800 mb-3 flex justify-between items-center">
+        <div class="flex items-center">
+            <i class="ph ph-activity icon mr-3"></i>
+            <h2 class="text-xl font-semibold">Network Activity Log</h2>
+        </div>
+        <div class="space-x-2 flex">
+            <button id="export-logs-btn" class="flex items-center text-sm px-3 py-1 bg-blue-500 text-white font-medium rounded-lg hover:bg-blue-600 transition duration-150 shadow-sm disabled:opacity-50" disabled>
+                <i class="ph ph-download mr-1 text-base "></i> Export CSV
+            </button>
+            <button id="clear-logs-btn" class="flex items-center text-sm px-3 py-1 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition duration-150 shadow-sm disabled:opacity-50">
+                <i class="ph ph-trash mr-1 text-base"></i> Clear Log
+            </button>
+        </div>
+    </div>
 
-    let lastKnownStatus = null; // To track status for change-only logging
+    <div class="border border-indigo-200 rounded-lg overflow-hidden shadow-sm">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-indigo-200">
+                <thead class="bg-indigo-500">
+                <tr>
+                    <th class="px-6 py-3 text-left text-sm font-medium text-white uppercase tracking-wider w-1/4">
+                        ID
+                    </th>
+                    <th class="px-6 py-3 text-left text-sm font-medium text-white uppercase tracking-wider w-2/4">
+                        Timestamp
+                    </th>
+                    <th class="px-6 py-3 text-left text-sm font-medium text-white uppercase tracking-wider w-1/4">
+                        Status
+                    </th>
+                </tr>
+                </thead>
+            </table>
+        </div>
+        <div id="log-body-container" class="max-h-80 overflow-y-auto bg-white">
+            <table class="min-w-full divide-y divide-indigo-200">
+                <tbody id="log-table-body" class="bg-white divide-y divide-indigo-200">
+                <tr>
+                    <td colspan="3" class="px-6 py-4 text-sm text-gray-500 text-center">No history yet.</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
 
-    // Configuration and Constants
-    const REFRESH_INTERVAL_MS = 1000; // Check connectivity every 1 second
-    const PRIMARY_URL = 'https://www.google.com/favicon.ico'; // Connectivity Endpoint (Single source check)
+<div class="mt-6 pt-4 border-t border-gray-200 text-center text-xs text-gray-400">
+    Copyright &copy; <span id="copyright-year"></span> Woliul Hasan. All rights reserved.
+</div>
 
-    // --- Utility Functions (UI remain local) ---
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/sql-wasm.js"></script>
 
-    /**
-     * Parses the status text (UP/DOWN/CHECKING) and returns the corresponding classes.
-     */
-    function getStatusClasses(status) {
-        const normalizedStatus = (status || '').toUpperCase();
-        // ... (rest of getStatusClasses remains the same)
-        if (normalizedStatus === 'UP') {
-            return {
-                textClass: 'text-green-500',
-                iconClass: 'ph ph-caret-up-fill',
-                spinnerClass: 'bg-green-500',
-                pingClass: 'bg-green-400',
-                badgeClass: 'status-badge status-up',
-                display: 'UP',
-                isChecking: false
+<script>
+    // --- CONSTANTS ---
+    const DB_NAME = 'networkMonitorDB';
+    const DB_STORE_NAME = 'sqliteData';
+    const FETCH_TARGET = 'https://www.google.com/favicon.ico'; // Small, reliable file
+    const FETCH_TIMEOUT_MS = 5000;
+    // Hardcode the interval for permanent auto-monitoring
+    const MONITORING_INTERVAL_MS = 1000; // 1 second
+
+    // --- STATE VARIABLES ---
+    let SQL;           // Holds the sql.js module
+    let db;            // Holds the SQLite database instance
+    let monitorInterval = null; // Holds the setInterval ID
+    let lastKnownStatus = null; // 'Up' or 'Down'
+
+    // --- DOM ELEMENTS ---
+    const statusDisplay = document.getElementById('status-display');
+    const clearLogsBtn = document.getElementById('clear-logs-btn');
+    const exportLogsBtn = document.getElementById('export-logs-btn');
+    const logTableBody = document.getElementById('log-table-body');
+    const copyright = document.getElementById('copyright-year');
+
+    // ==============================
+    // 1. IndexedDB Persistence Logic (UNMODIFIED)
+    // ==============================
+
+    async function saveDbToIndexedDB() {
+        if (!db) return;
+        const data = db.export();
+
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open(DB_NAME, 1);
+
+            request.onupgradeneeded = function(e) {
+                const idb = e.target.result;
+                idb.createObjectStore(DB_STORE_NAME);
             };
-        }
-        if (normalizedStatus === 'DOWN') {
-            return {
-                textClass: 'text-red-500',
-                iconClass: 'ph ph-caret-down-fill',
-                spinnerClass: 'bg-red-500',
-                pingClass: 'bg-red-400',
-                badgeClass: 'status-badge status-down',
-                display: 'DOWN',
-                isChecking: false
+
+            request.onsuccess = function(e) {
+                const idb = e.target.result;
+                const transaction = idb.transaction([DB_STORE_NAME], 'readwrite');
+                const store = transaction.objectStore(DB_STORE_NAME);
+
+                const putRequest = store.put(data, 'main');
+
+                putRequest.onsuccess = () => resolve();
+                putRequest.onerror = (err) => reject(err);
             };
-        }
-        return {
-            textClass: 'text-yellow-500',
-            iconClass: 'ph ph-question',
-            spinnerClass: 'bg-yellow-500',
-            pingClass: 'bg-yellow-400',
-            badgeClass: '',
-            display: 'CHECKING...',
-            isChecking: true
-        };
+
+            request.onerror = (e) => reject(e.target.error);
+        });
     }
 
-    /**
-     * Renders the current status of the single link card.
-     */
-    function renderLinkStatus(status) {
-        const classes = getStatusClasses(status);
-        const statusTextEl = document.getElementById(`primary-link-status-text`);
-        const statusSpinnerEl = document.getElementById(`primary-link-status-spinner`);
+    async function loadDbFromIndexedDB() {
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open(DB_NAME, 1);
 
-        if (!statusTextEl || !statusSpinnerEl) return;
+            request.onupgradeneeded = function(e) {
+                const idb = e.target.result;
+                idb.createObjectStore(DB_STORE_NAME);
+            };
 
-        // 1. Update spinner/ping animation
-        statusSpinnerEl.innerHTML = `
-                <span class="animate-ping absolute inline-flex h-full w-full rounded-full ${classes.pingClass} opacity-75"></span>
-                <span class="relative inline-flex rounded-full h-4 w-4 ${classes.spinnerClass}"></span>
-            `;
+            request.onsuccess = function(e) {
+                const idb = e.target.result;
+                const transaction = idb.transaction([DB_STORE_NAME], 'readonly');
+                const store = transaction.objectStore(DB_STORE_NAME);
 
-        // 2. Update status text and inject the icon HTML next to it
-        if (classes.isChecking) {
-            statusTextEl.innerHTML = `<span>${classes.display}</span>`;
-        } else {
-            statusTextEl.innerHTML = `
-                    <i class="${classes.iconClass} text-3xl mr-2"></i>
-                    <span>${classes.display}</span>
-                `;
-        }
-        statusTextEl.className = `font-extrabold text-2xl flex items-center ${classes.textClass}`;
+                const getRequest = store.get('main');
+
+                getRequest.onsuccess = function() {
+                    resolve(getRequest.result || null);
+                };
+                getRequest.onerror = (err) => reject(err);
+            };
+
+            request.onerror = (e) => reject(e.target.error);
+            request.onblocked = () => { /* Handle blocked state if needed */ };
+        });
     }
 
-    /**
-     * Attempts to fetch an external resource to check connectivity.
-     */
-    async function checkExternalConnectivity(url) {
+    async function deleteDbFromIndexedDB() {
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open(DB_NAME, 1);
+
+            request.onupgradeneeded = function(e) {
+                const idb = e.target.result;
+                if (!idb.objectStoreNames.contains(DB_STORE_NAME)) {
+                    idb.createObjectStore(DB_STORE_NAME);
+                }
+            };
+
+            request.onsuccess = function(e) {
+                const idb = e.target.result;
+                const transaction = idb.transaction([DB_STORE_NAME], 'readwrite');
+                const store = transaction.objectStore(DB_STORE_NAME);
+
+                const deleteRequest = store.delete('main');
+
+                deleteRequest.onsuccess = () => resolve();
+                deleteRequest.onerror = (err) => reject(err);
+            };
+
+            request.onerror = (e) => reject(e.target.error);
+        });
+    }
+
+    // ==============================
+    // 2. SQL.js Database Operations (UNMODIFIED)
+    // ==============================
+
+    async function initDb() {
         try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 8000);
-
-            // Use fetch, which is available in the Renderer process
-            const response = await fetch(url, {
-                method: 'GET',
-                mode: 'no-cors',
-                signal: controller.signal
+            SQL = await initSqlJs({
+                locateFile: file => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/${file}`
             });
 
+            const data = await loadDbFromIndexedDB();
+
+            if (data) {
+                db = new SQL.Database(data);
+                console.log('Database loaded from IndexedDB.');
+            } else {
+                db = new SQL.Database();
+                db.exec(`
+                    CREATE TABLE network_logs (
+                                                  id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                                  timestamp TEXT NOT NULL,
+                                                  status TEXT NOT NULL
+                    );
+                `);
+                console.log('New database created.');
+                await saveDbToIndexedDB();
+            }
+
+            await updateLogDisplay();
+            updateUI(null, 'Initializing...');
+            clearLogsBtn.disabled = false;
+            exportLogsBtn.disabled = false;
+
+            startMonitoring();
+
+        } catch (error) {
+            console.error('Error initializing database:', error);
+            alert('Failed to initialize database. Check console for details.');
+        }
+    }
+
+    function logNetworkStatus(status) {
+        if (!db) return;
+
+        const timestamp = new Date().toISOString();
+        const statement = db.prepare("INSERT INTO network_logs (timestamp, status) VALUES (?, ?)");
+
+        try {
+            statement.run([timestamp, status]);
+            saveDbToIndexedDB().catch(e => console.error('Failed to save DB after logging:', e));
+            updateLogDisplay();
+
+        } catch (e) {
+            console.error('Error executing SQL:', e);
+        } finally {
+            statement.free();
+        }
+    }
+
+    // ==============================
+    // 3. Network Monitoring Logic (UNMODIFIED)
+    // ==============================
+
+    async function isConnected() {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
+        try {
+            await fetch(FETCH_TARGET, {
+                method: 'HEAD',
+                cache: 'no-store',
+                signal: controller.signal,
+                mode: 'no-cors'
+            });
             clearTimeout(timeoutId);
             return true;
         } catch (error) {
-            if (error.name === 'AbortError') {
-                console.error(`Connectivity check failed for ${url}: Timeout.`);
-            } else {
-                // This is likely the "DOWN" state (network error, CORS block)
-                console.error(`Connectivity check failed for ${url}:`, error.message);
-            }
+            clearTimeout(timeoutId);
             return false;
         }
     }
 
-    // --- IPC Database Operations (Communication with main.js) ---
+    async function performCheck() {
+        const isUp = await isConnected();
+        const currentStatus = isUp ? 'Up' : 'Down';
+        updateUI(currentStatus, `Last checked: ${new Date().toLocaleTimeString()}`);
+
+        if (currentStatus !== lastKnownStatus) {
+            logNetworkStatus(currentStatus);
+            lastKnownStatus = currentStatus;
+        }
+    }
+
+    function startMonitoring() {
+        if (monitorInterval) return;
+        performCheck();
+        monitorInterval = setInterval(performCheck, MONITORING_INTERVAL_MS);
+        console.log(`Monitoring started automatically at ${MONITORING_INTERVAL_MS / 1000}s interval.`);
+    }
+
+    // ==============================
+    // 4. UI Functions & Event Handlers
+    // ==============================
 
     /**
-     * Sends a new log entry to the main process for persistent storage.
-     * @param {string} status The status (UP/DOWN).
+     * Exports all logs from the database to a CSV file.
+     * Uses local timestamp formatting. (UNMODIFIED)
      */
-    async function saveLogToMain(status) {
-        if (typeof window.api === 'undefined') {
-            console.error("Electron API bridge (window.api) not available.");
-            return;
-        }
+    function exportLogsToCsv() {
+        if (!db) return alert('Database not initialized.');
 
-        const logEntry = {
-            timestamp: new Date().toISOString(),
-            status: status
-        };
+        try {
+            const res = db.exec("SELECT id, timestamp, status FROM network_logs ORDER BY id ASC");
 
-        const result = await window.api.saveLog(logEntry);
+            if (res.length === 0 || res[0].values.length === 0) {
+                return alert('No data to export.');
+            }
 
-        if (result.success) {
-            console.log(`Log entry sent to main process successfully: ${status}`);
-        } else {
-            console.error("Failed to save log via IPC:", result.error);
+            const rows = res[0].values;
+            const columns = res[0].columns;
+
+            let csvContent = columns.join(',') + '\n';
+            rows.forEach(row => {
+                const [id, isoTimestamp, status] = row;
+
+                const date = new Date(isoTimestamp);
+
+                const formattedTimestamp = date.toLocaleDateString() + ' ' +
+                    date.toLocaleTimeString([], { hour12: true, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+                const exportRow = [id, formattedTimestamp, status];
+                const formattedRow = exportRow.map(value => `"${String(value).replace(/"/g, '""')}"`);
+                csvContent += formattedRow.join(',') + '\n';
+            });
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+
+            const date = new Date().toISOString().slice(0, 19).replace('T', '_').replace(/:/g, '-');
+            link.setAttribute("href", url);
+            link.setAttribute("download", `network_log_${date}.csv`);
+
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+
+            console.log('Logs exported to CSV successfully.');
+
+        } catch (e) {
+            console.error('Error exporting logs:', e);
+            alert('Failed to export logs. See console for details.');
         }
     }
 
     /**
-     * Renders the data fetched from the Main process into the HTML table.
+     * Updates the main status display element with the new visual style
+     * using the pulsing dot. (MODIFIED)
      */
-    async function refreshLogTable() {
-        if (typeof window.api === 'undefined') return;
+    function updateUI(status, message) {
+        let statusContent;
+        let statusClasses;
 
-        const logs = await window.api.getLogs(); // Fetch logs from main process (reverse ordered by default)
-        const body = document.getElementById('link-log-body');
-        const loadingIndicator = document.getElementById('log-loading-indicator');
-
-        loadingIndicator.classList.add('hidden');
-
-        // Check if logs were successfully retrieved and update lastKnownStatus
-        if (logs.length > 0) {
-            if (lastKnownStatus === null) {
-                // Logs come DESC (newest first) from main.js
-                lastKnownStatus = logs[0].status;
-            }
+        // 1. Determine Content and New Classes
+        if (status === 'Up') {
+            // Inject the dot HTML and set text
+            statusContent = `<span class="status-dot"></span>UP`;
+            // Apply custom classes defined in CSS for the visual style
+            statusClasses = 'status-up font-extrabold text-2xl transition-colors duration-300';
+        } else if (status === 'Down') {
+            statusContent = `<span class="status-dot"></span>Down`;
+            statusClasses = 'status-down font-extrabold text-2xl transition-colors duration-300';
         } else {
+            // Default/Initializing state
+            statusContent = message;
+            // Use the base classes for the initial state look
+            statusClasses = 'p-3 text-center rounded-lg font-extrabold text-2xl transition-colors duration-300 bg-gray-200 text-gray-700 status-default';
+        }
+
+        // 2. Apply Changes
+        statusDisplay.className = statusClasses;
+        statusDisplay.innerHTML = statusContent; // Use innerHTML to inject the <span> dot
+    }
+
+
+    async function updateLogDisplay() {
+        if (!db) return;
+
+        logTableBody.innerHTML = '';
+
+        try {
+            const res = db.exec("SELECT id, timestamp, status FROM network_logs ORDER BY id DESC");
+
+            if (res.length === 0 || res[0].values.length === 0) {
+                logTableBody.innerHTML = `<tr><td colspan="3" class="px-6 py-4 text-sm text-gray-500 text-center">No history yet.</td></tr>`;
+                exportLogsBtn.disabled = true;
+                return;
+            }
+
+            exportLogsBtn.disabled = false;
+
+            const rows = res[0].values;
+
+            rows.forEach(row => {
+                const [id, isoTimestamp, status] = row;
+                const date = new Date(isoTimestamp);
+
+                const timeString = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                const dateString = date.toLocaleDateString();
+
+                const statusColor = status === 'Up' ? 'text-green-600 font-semibold' : 'text-red-600 font-semibold';
+
+                const newRow = logTableBody.insertRow();
+                newRow.className = 'hover:bg-gray-50';
+
+                let idCell = newRow.insertCell();
+                idCell.className = 'px-6 py-2 text-sm font-medium text-gray-900';
+                idCell.textContent = id;
+
+                let timestampCell = newRow.insertCell();
+                timestampCell.className = 'px-6 py-2 text-sm text-gray-700 font-mono';
+                timestampCell.innerHTML = `<span class="block">${dateString}</span><span class="text-xs text-gray-500">${timeString}</span>`;
+
+                let statusCell = newRow.insertCell();
+                statusCell.className = `px-6 py-2 text-sm ${statusColor}`;
+                statusCell.textContent = status;
+
+                let copyrightYear = date.toLocaleDateString(undefined, { year: 'numeric' });
+                copyright.innerHTML = `<span class="font-bold">${copyrightYear}</span>`;
+            });
+
+        } catch (e) {
+            console.error('Error querying logs:', e);
+        }
+    }
+
+    async function clearLogs() {
+        if (!confirm('Are you sure you want to clear all connection history? This action is irreversible.')) {
+            return;
+        }
+
+        try {
+            db.exec("DROP TABLE IF EXISTS network_logs;");
+            db.exec(`
+                CREATE TABLE network_logs (
+                                              id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                              timestamp TEXT NOT NULL,
+                                              status TEXT NOT NULL
+                );
+            `);
+
+            await deleteDbFromIndexedDB();
+            await saveDbToIndexedDB();
+
             lastKnownStatus = null;
-        }
+            await updateLogDisplay();
+            updateUI(null, 'Logs cleared. Monitoring continues automatically.');
 
-        // Render logs
-        body.innerHTML = logs.map((entry, i) => {
-            const classes = getStatusClasses(entry.status);
-            // Calculate SL: Logs are ordered DESC (newest first) from main.js, so we reverse the index
-            const serialNumber = logs.length - i;
-            const date = new Date(entry.timestamp);
-            const displayTimestamp = date.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' ' + date.toLocaleDateString();
+            performCheck();
 
-            return `
-                    <tr class="border-b border-gray-700 hover:bg-gray-800">
-                        <td class="px-6 py-4 font-mono w-16">${serialNumber}</td>
-                        <td class="px-6 py-4 font-mono">${displayTimestamp}</td>
-                        <td class="px-6 py-4"><span class="${classes.badgeClass}">${entry.status}</span></td>
-                    </tr>
-                `;
-        }).join('');
-
-        if (logs.length === 0) {
-            body.innerHTML = `
-                     <tr>
-                         <td colspan="3" class="px-6 py-8 text-center text-gray-500">
-                             The persistent network change log is currently empty.
-                         </td>
-                     </tr>
-                   `;
+        } catch (error) {
+            console.error('Error clearing logs:', error);
+            alert('Failed to clear logs. See console for details.');
         }
     }
 
-    /**
-     * Triggers the log clearing function in the Main process.
-     */
-    async function clearLogHandler() {
-        if (typeof window.api === 'undefined') return;
-        const result = await window.api.clearLogs();
 
-        if (result.success) {
-            refreshLogTable();
-            document.getElementById('persistence-status').textContent = 'Persistence: Log cleared in persistent file.';
-        } else {
-            // NOTE: Replace alert() with a modal in a real Electron app if needed.
-            console.error('Failed to clear logs:', result.error);
-        }
-    }
+    // ==============================
+    // 5. Initialization
+    // ==============================
 
-    /**
-     * Triggers the CSV export function in the Main process (uses native dialog).
-     */
-    async function exportLogCSVHandler() {
-        if (typeof window.api === 'undefined') return;
+    clearLogsBtn.addEventListener('click', clearLogs);
+    exportLogsBtn.addEventListener('click', exportLogsToCsv);
 
-        document.getElementById('persistence-status').textContent = 'Persistence: Launching save dialog...';
-        const result = await window.api.exportLogCsv();
+    clearLogsBtn.disabled = true;
+    exportLogsBtn.disabled = true;
 
-        if (result.success) {
-            document.getElementById('persistence-status').textContent = `Persistence: ${result.message}`;
-        } else {
-            // Check for user cancel
-            if (!result.message.includes('canceled')) {
-                document.getElementById('persistence-status').textContent = `Persistence: Export failed.`;
-                console.error('Export failed:', result.message);
-            } else {
-                document.getElementById('persistence-status').textContent = `Persistence: Export canceled.`;
-            }
-        }
-    }
+    initDb();
+    // (6 hours * 60 min * 60 sec * 1000 ms = 21,600,000 ms)
+    const AUTO_BACKUP_INTERVAL_MS = 6 * 1000;
+    setInterval(saveDbToIndexedDB, AUTO_BACKUP_INTERVAL_MS);
+    console.log(`IndexedDB auto-save started at ${AUTO_BACKUP_INTERVAL_MS / 1000 / 6} hour interval.`);
 
-    // --- Core Application Logic ---
 
-    /**
-     * Checks connectivity, updates UI, and logs the change to the Main process.
-     */
-    async function checkNetworkConnectivity() {
-        // 1. Update footer timestamp with seconds
-        const now = new Date();
-        const timeString = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
-        document.getElementById('footer-last-updated').textContent = `Last Check: ${timeString} ${now.toLocaleDateString()}`;
+    window.addEventListener('beforeunload', saveDbToIndexedDB);
 
-        // 2. Check Link Status
-        const primaryUp = await checkExternalConnectivity(PRIMARY_URL);
-        const primaryStatus = primaryUp ? 'UP' : 'DOWN';
-        renderLinkStatus(primaryStatus);
 
-        // 3. Log status change to Main Process (Change-Only Logic)
-        if (primaryStatus !== lastKnownStatus) {
-            console.log(`Status changed from ${lastKnownStatus} to ${primaryStatus}. Sending to Main Process...`);
-            await saveLogToMain(primaryStatus);
-            lastKnownStatus = primaryStatus;
-
-            // 4. Refresh the log table after a change
-            refreshLogTable();
-        }
-    }
-
-    /**
-     * Initializes the application for the Electron environment.
-     */
-    function initElectronApp() {
-        if (typeof window.api === 'undefined') {
-            document.getElementById('log-loading-indicator').textContent = "ERROR: Electron context bridge not found. Run this file in an Electron environment.";
-            return;
-        }
-
-        document.getElementById('persistence-status').textContent = 'Persistence: Database loaded from disk. Hourly backup active.';
-
-        // Listen for status updates sent from the main process (e.g., after an hourly backup)
-        window.api.onBackupStatus((message) => {
-            document.getElementById('persistence-status').textContent = message;
-        });
-
-        // Attach event listeners for buttons
-        document.getElementById('clear-log-btn').addEventListener('click', clearLogHandler);
-        document.getElementById('export-log-btn').addEventListener('click', exportLogCSVHandler);
-
-        // Initial load of logs from the persistent file
-        refreshLogTable();
-        renderLinkStatus(null);
-        checkNetworkConnectivity();
-
-        // Start the connectivity check interval (1 second)
-        setInterval(checkNetworkConnectivity, REFRESH_INTERVAL_MS);
-    }
-
-    // --- Initialization ---
-
-    window.onload = function() {
-        initElectronApp();
-    };
 
 </script>
 </body>
