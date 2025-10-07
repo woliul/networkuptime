@@ -1,0 +1,26 @@
+directories:
+  output: dist
+  buildResources: build
+appId: com.woliul.uptimevault
+productName: uptimevault
+icon: ./assets/network.png
+win:
+  target: nsis
+mac:
+  target: dmg
+files:
+  - filter:
+      - main.js
+      - index.html
+      - assets/**/*
+      - sql/sql-wasm.wasm
+      - sql/
+      - css/
+      - js/
+      - node_modules/electron/dist/ffmpeg.dll
+asar: true
+publish:
+  - provider: github
+    owner: woliul
+    repo: uptimevault
+electronVersion: 28.3.3

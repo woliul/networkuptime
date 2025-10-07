@@ -1,0 +1,8 @@
+version: 1.0.5
+files:
+  - url: uptimevault-Setup-1.0.5.exe
+    sha512: mATGj4VxoShygT6esfu0Q+dWj3LzVltrvoNVllRxRJlflH3iJjGWZl1qmdcbZkPlGySUnova2Fg6LtcHJPnb5Q==
+    size: 85138073
+path: uptimevault-Setup-1.0.5.exe
+sha512: mATGj4VxoShygT6esfu0Q+dWj3LzVltrvoNVllRxRJlflH3iJjGWZl1qmdcbZkPlGySUnova2Fg6LtcHJPnb5Q==
+releaseDate: '2025-10-07T18:16:50.867Z'
