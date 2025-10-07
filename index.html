@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>💡 Network Monitor | SQLite in Browser</title>
+    <title>UptimeVault by Woliul Hasan : Prove Your ISP Drops</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
 
@@ -128,8 +128,8 @@
 <body class="bg-gray-50 p-4 md:p-8 min-h-screen">
 
 <header class="text-center mb-8 md:mb-12">
-    <h1 class="text-3xl md:text-4xl text-gray-700 font-bold">Network Monitoring Dashboard</h1>
-    <p class="text-text-sm-400 mt-2">Real-time Network Monitoring</p>
+    <h1 class="text-3xl md:text-4xl text-gray-700 font-bold">UptimeVault</h1>
+    <p class="text-text-sm-400 mt-2">Stop Guessing. Start Proving. Secure, Local Connectivity Tracking.</p>
 </header>
 
 <div class="grid grid-cols-1 gap-6 md:gap-8">
@@ -137,29 +137,29 @@
     <div class="card p-8 bg-white border border-gray-200">
         <div class="flex items-center justify-between">
             <div >
-                <h2 class="text-3xl font-bold text-gray-700 mb-1">Network Status</h2>
-                <p class="text-sm text-gray-500 mb-4">Connectivity Check Host: Google</p>
+                <h2 class="text-3xl font-bold text-gray-700 mb-1">Connection Status</h2>
+                <p class="text-sm text-gray-500 mb-4">Stability Check: Google Public Host</p>
             </div>
 
             <div id="status-display" class="p-3 text-center rounded-lg font-extrabold text-2xl transition-colors duration-300 bg-gray-200 text-gray-700 status-default">
-                Initializing...
+                Checking...
             </div>
         </div>
     </div>
 </div>
 
 <div class="card p-8 bg-white border border-gray-200 mt-8">
-    <div class="text-xl font-semibold text-gray-800 mb-3 flex justify-between items-center">
+    <div class="text-xl font-semibold text-gray-800 mb-3 flex justify-between items-center space-x-2 flex flex-col sm:flex-row sm:space-x-2 sm:space-y-0 space-y-2">
         <div class="flex items-center">
             <i class="ph ph-activity icon mr-3"></i>
-            <h2 class="text-xl font-semibold">Network Activity Log</h2>
+            <h2 class="text-xl font-semibold">Activity Log</h2>
         </div>
-        <div class="space-x-2 flex">
+        <div class="flex flex-col space-y-2 sm:flex-row sm:space-y-0 sm:space-x-2">
             <button id="export-logs-btn" class="flex items-center text-sm px-3 py-1 bg-blue-500 text-white font-medium rounded-lg hover:bg-blue-600 transition duration-150 shadow-sm disabled:opacity-50" disabled>
-                <i class="ph ph-download mr-1 text-base "></i> Export CSV
+                <i class="ph ph-download mr-1 text-base "></i> Download Log (.CSV)
             </button>
             <button id="clear-logs-btn" class="flex items-center text-sm px-3 py-1 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition duration-150 shadow-sm disabled:opacity-50">
-                <i class="ph ph-trash mr-1 text-base"></i> Clear Log
+                <i class="ph ph-trash mr-1 text-base"></i> Clear History
             </button>
         </div>
     </div>
@@ -173,20 +173,21 @@
                         ID
                     </th>
                     <th class="px-6 py-3 text-left text-sm font-medium text-white uppercase tracking-wider w-2/4">
-                        Timestamp
+                        Date & Time
                     </th>
                     <th class="px-6 py-3 text-left text-sm font-medium text-white uppercase tracking-wider w-1/4">
                         Status
                     </th>
                 </tr>
                 </thead>
+
             </table>
         </div>
         <div id="log-body-container" class="max-h-80 overflow-y-auto bg-white">
             <table class="min-w-full divide-y divide-indigo-200">
                 <tbody id="log-table-body" class="bg-white divide-y divide-indigo-200">
                 <tr>
-                    <td colspan="3" class="px-6 py-4 text-sm text-gray-500 text-center">No history yet.</td>
+                    <td colspan="3" class="px-6 py-4 text-sm text-gray-500 text-center">No connection history logged yet. Monitoring is active.</td>
                 </tr>
                 </tbody>
             </table>
@@ -343,7 +344,7 @@
 
         } catch (error) {
             console.error('Error initializing database:', error);
-            alert('Failed to initialize database. Check console for details.');
+            alert('UptimeVault failed to load local history. Please restart the application. If the problem persists, data files may be corrupted. Contact support.');
         }
     }
 
@@ -421,7 +422,7 @@
             const res = db.exec("SELECT id, timestamp, status FROM network_logs ORDER BY id ASC");
 
             if (res.length === 0 || res[0].values.length === 0) {
-                return alert('No data to export.');
+                return alert('No logged activity to export.');
             }
 
             const rows = res[0].values;
@@ -544,7 +545,7 @@
     }
 
     async function clearLogs() {
-        if (!confirm('Are you sure you want to clear all connection history? This action is irreversible.')) {
+        if (!confirm('Are you sure you want to permanently delete ALL connection history? Please Download your logs if needed.')) {
             return;
         }
 
@@ -563,7 +564,7 @@
 
             lastKnownStatus = null;
             await updateLogDisplay();
-            updateUI(null, 'Logs cleared. Monitoring continues automatically.');
+            updateUI(null, 'Logs Cleared. Monitoring Resumed.');
 
             performCheck();
 
