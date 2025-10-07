@@ -1,5 +1,5 @@
 {
-  "name": "network-uptime-monitor",
+  "name": "uptimevault",
   "version": "1.0.4",
   "description": "An offline network uptime monitor develop by Woliul Hasan.",
   "main": "main.js",
@@ -20,8 +20,8 @@
     "electron-builder": "^24.9.1"
   },
   "build": {
-    "appId": "com.woliul.NetworkUptime",
-    "productName": "NetworkUptime",
+    "appId": "com.woliul.uptimevault",
+    "productName": "uptimevault",
     "icon": "./assets/network.png",
     "win": {
       "target": "nsis"
@@ -44,7 +44,7 @@
       {
         "provider": "github",
         "owner": "woliul",
-        "repo": "networkuptime"
+        "repo": "uptimevault"
       }
     ]
   },
