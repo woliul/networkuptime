@@ -29,7 +29,7 @@ A simple, powerful, and **offline-first system** for tracking, logging, and prov
 1.  Clone this repository to your local machine:
 
     ```bash
-    git clone [https://github.com/woliul/uptimevault.git](https://github.com/woliul/uptimevault.git)
+    git clone https://github.com/woliul/uptimevault.git
     cd uptimevault
     ```
 
