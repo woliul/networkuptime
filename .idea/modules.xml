@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/networkuptime.iml" filepath="$PROJECT_DIR$/.idea/networkuptime.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/uptimevault.iml" filepath="$PROJECT_DIR$/.idea/uptimevault.iml" />
     </modules>
   </component>
 </project>
