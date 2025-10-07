@@ -1,6 +1,6 @@
 {
   "name": "uptimevault",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "An offline network uptime monitor develop by Woliul Hasan.",
   "main": "main.js",
   "scripts": {
