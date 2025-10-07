@@ -54,10 +54,7 @@ To create a distributable installer for Windows, macOS, or Linux, the project us
 ```bash
 npm run build
 ```
-
 > **Note**: This single command is configured to generate the appropriate installer for your current operating system (e.g., `.exe` for Windows, `.dmg` for macOS, or `.AppImage` for Linux).
-
------
 
 ## 📂 Project Structure
 
