@@ -2,6 +2,11 @@
 
 A simple, powerful, and **offline-first system** for tracking, logging, and proving every ISP connectivity drop. Use it as a mobile-friendly web tool or a dedicated cross-platform desktop app.
 
+
+
+<img alt="UptimeVault Screenshot" src="https://raw.githubusercontent.com/woliul/uptimevault/master/assets/UptimeVault-by-Woliul-Hasan.png" />
+
+
 ## ✨ Features
 
 * **Dual-Access Platform**: Use it immediately as a **mobile-friendly web application** in your browser, or rely on the persistent power of the dedicated **Electron desktop app**.
